@@ -1,0 +1,10 @@
+[project]
+name = "reqengineer"
+version = "0.1.0"
+description = "A small CLI AI agent for turning rough product ideas into requirements."
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.139.0",
+    "uvicorn>=0.50.2",
+]

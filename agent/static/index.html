@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ReqEngineer</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --text: #18202a;
+        --muted: #667085;
+        --line: #d9dee7;
+        --accent: #1f7a5a;
+        --accent-dark: #176245;
+        --danger: #b42318;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--text);
+        background: var(--bg);
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 56px;
+        padding: 0 20px;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 650;
+      }
+
+      .status {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 420px;
+        gap: 16px;
+        height: calc(100vh - 56px);
+        padding: 16px;
+      }
+
+      .panel {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        overflow: hidden;
+      }
+
+      .chat {
+        display: grid;
+        grid-template-rows: 1fr auto;
+      }
+
+      .messages {
+        overflow: auto;
+        padding: 18px;
+      }
+
+      .message {
+        max-width: 760px;
+        margin: 0 0 12px;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+      }
+
+      .message.user {
+        margin-left: auto;
+        background: #e9f5ef;
+        border-color: #b9ddcc;
+      }
+
+      .message.assistant {
+        background: #ffffff;
+      }
+
+      .composer {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        padding: 12px;
+        border-top: 1px solid var(--line);
+        background: #fbfcfd;
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 52px;
+        max-height: 160px;
+        resize: vertical;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px 12px;
+        font: inherit;
+      }
+
+      button {
+        min-width: 88px;
+        height: 40px;
+        align-self: end;
+        border: 0;
+        border-radius: 8px;
+        background: var(--accent);
+        color: #ffffff;
+        font: inherit;
+        font-weight: 650;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: var(--accent-dark);
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      .requirements {
+        display: grid;
+        grid-template-rows: auto 1fr;
+      }
+
+      .requirements header {
+        min-height: 48px;
+        padding: 0 14px;
+      }
+
+      .requirements h2 {
+        margin: 0;
+        font-size: 15px;
+      }
+
+      .cards {
+        overflow: auto;
+        padding: 12px;
+      }
+
+      .empty {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 10px;
+        background: #ffffff;
+      }
+
+      .card h3 {
+        margin: 0 0 8px;
+        font-size: 14px;
+      }
+
+      .card p {
+        margin: 0 0 10px;
+        color: #344054;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .pill {
+        padding: 3px 7px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .error {
+        color: var(--danger);
+      }
+
+      @media (max-width: 900px) {
+        main {
+          grid-template-columns: 1fr;
+          height: auto;
+          min-height: calc(100vh - 56px);
+        }
+
+        .chat {
+          min-height: 62vh;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>ReqEngineer</h1>
+      <div id="status" class="status">Starting conversation...</div>
+    </header>
+
+    <main>
+      <section class="panel chat" aria-label="Conversation">
+        <div id="messages" class="messages"></div>
+        <form id="form" class="composer">
+          <textarea
+            id="input"
+            placeholder="Describe what you want. When ready, say: create the requirements"
+            autocomplete="off"
+          ></textarea>
+          <button id="send" type="submit">Send</button>
+        </form>
+      </section>
+
+      <aside class="panel requirements" aria-label="Requirements">
+        <header>
+          <h2>Requirements</h2>
+        </header>
+        <div id="cards" class="cards">
+          <p class="empty">No requirements yet. Continue the conversation, then ask the agent to create them.</p>
+        </div>
+      </aside>
+    </main>
+
+    <script>
+      const statusEl = document.querySelector("#status");
+      const messagesEl = document.querySelector("#messages");
+      const cardsEl = document.querySelector("#cards");
+      const formEl = document.querySelector("#form");
+      const inputEl = document.querySelector("#input");
+      const sendEl = document.querySelector("#send");
+
+      let conversationId = null;
+
+      function setStatus(text, isError = false) {
+        statusEl.textContent = text;
+        statusEl.classList.toggle("error", isError);
+      }
+
+      function addMessage(role, content) {
+        const item = document.createElement("div");
+        item.className = `message ${role}`;
+        item.textContent = content;
+        messagesEl.appendChild(item);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function renderRequirements(requirements) {
+        if (!requirements.length) return;
+        cardsEl.replaceChildren();
+
+        for (const requirement of requirements) {
+          const card = document.createElement("article");
+          card.className = "card";
+
+          const title = document.createElement("h3");
+          title.textContent = requirement.name;
+
+          const description = document.createElement("p");
+          description.textContent = requirement.description;
+
+          const meta = document.createElement("div");
+          meta.className = "meta";
+
+          for (const value of [requirement.priority, requirement.status, requirement.id]) {
+            const pill = document.createElement("span");
+            pill.className = "pill";
+            pill.textContent = value;
+            meta.appendChild(pill);
+          }
+
+          card.append(title, description, meta);
+          cardsEl.appendChild(card);
+        }
+      }
+
+      async function createConversation() {
+        const response = await fetch("/conversations", { method: "POST" });
+        if (!response.ok) throw new Error(`Conversation failed: ${response.status}`);
+        const data = await response.json();
+        conversationId = data.conversation_id;
+        setStatus(`Conversation ${conversationId}`);
+      }
+
+      async function sendMessage(content) {
+        const response = await fetch(`/conversations/${conversationId}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content, review_iterations: 0 }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || `Request failed: ${response.status}`);
+        }
+
+        addMessage("assistant", data.message.content);
+        renderRequirements(data.requirements || []);
+
+        if (data.actions_performed?.length) {
+          setStatus(`${conversationId} · ${data.actions_performed.join(", ")}`);
+        } else {
+          setStatus(`Conversation ${conversationId}`);
+        }
+      }
+
+      formEl.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const content = inputEl.value.trim();
+        if (!content || !conversationId) return;
+
+        inputEl.value = "";
+        addMessage("user", content);
+        sendEl.disabled = true;
+        setStatus("Waiting for agent...");
+
+        try {
+          await sendMessage(content);
+        } catch (error) {
+          addMessage("assistant", error.message);
+          setStatus(error.message, true);
+        } finally {
+          sendEl.disabled = false;
+          inputEl.focus();
+        }
+      });
+
+      createConversation()
+        .then(() => {
+          addMessage(
+            "assistant",
+            "Tell me what you want to build. When the scope feels right, ask me to create the requirements."
+          );
+          inputEl.focus();
+        })
+        .catch((error) => {
+          setStatus(error.message, true);
+        });
+    </script>
+  </body>
+</html>
