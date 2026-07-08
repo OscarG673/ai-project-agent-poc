@@ -13,8 +13,13 @@ from mcp.types import TextContent, Tool
 load_dotenv()
 
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000").rstrip("/")
+API_AUTH_TOKEN = os.getenv("API_AUTH_TOKEN", "")
 
 server = Server("project-manager")
+
+
+def _auth_headers() -> dict[str, str]:
+    return {"Authorization": f"Bearer {API_AUTH_TOKEN}"} if API_AUTH_TOKEN else {}
 
 
 def _api_error(response: httpx.Response) -> str:
@@ -26,7 +31,9 @@ def _api_error(response: httpx.Response) -> str:
 
 
 async def _request(method: str, path: str, **kwargs: Any) -> str:
-    async with httpx.AsyncClient(base_url=API_BASE_URL, timeout=30.0) as client:
+    async with httpx.AsyncClient(
+        base_url=API_BASE_URL, timeout=30.0, headers=_auth_headers()
+    ) as client:
         response = await client.request(method, path, **kwargs)
         if response.status_code == 204:
             return json.dumps({"success": True, "message": "Deleted successfully"})

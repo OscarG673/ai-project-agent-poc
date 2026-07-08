@@ -1,6 +1,31 @@
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 const AGENT_URL = import.meta.env.VITE_AGENT_URL ?? "http://localhost:8001";
 
+const TOKEN_KEY = "auth_token";
+
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function clearToken(): void {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+/** Callback invoked when any request gets a 401 (e.g. expired token). */
+let onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: () => void): void {
+  onUnauthorized = fn;
+}
+
+function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const token = getToken();
+  return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
+}
+
 export interface Project {
   id: number;
   name: string;
@@ -29,6 +54,10 @@ export interface ToolExecution {
 }
 
 async function handleResponse<T>(response: Response): Promise<T> {
+  if (response.status === 401) {
+    clearToken();
+    onUnauthorized?.();
+  }
   if (!response.ok) {
     const body = await response.text();
     throw new Error(body || `Request failed (${response.status})`);
@@ -39,15 +68,42 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export interface CurrentUser {
+  id: number;
+  username: string;
+  status: boolean;
+  created_at: string;
+}
+
+export async function login(username: string, password: string): Promise<string> {
+  const response = await fetch(`${API_URL}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  const data = await handleResponse<{ access_token: string }>(response);
+  setToken(data.access_token);
+  return data.access_token;
+}
+
+export async function fetchMe(): Promise<CurrentUser> {
+  const response = await fetch(`${API_URL}/auth/me`, {
+    headers: authHeaders(),
+  });
+  return handleResponse<CurrentUser>(response);
+}
+
 export async function fetchProjects(): Promise<Project[]> {
-  const response = await fetch(`${API_URL}/projects`);
+  const response = await fetch(`${API_URL}/projects`, {
+    headers: authHeaders(),
+  });
   return handleResponse<Project[]>(response);
 }
 
 export async function createProject(data: ProjectInput): Promise<Project> {
   const response = await fetch(`${API_URL}/projects`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(data),
   });
   return handleResponse<Project>(response);
@@ -59,7 +115,7 @@ export async function updateProject(
 ): Promise<Project> {
   const response = await fetch(`${API_URL}/projects/${id}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(data),
   });
   return handleResponse<Project>(response);
@@ -68,6 +124,7 @@ export async function updateProject(
 export async function deleteProject(id: number): Promise<void> {
   const response = await fetch(`${API_URL}/projects/${id}`, {
     method: "DELETE",
+    headers: authHeaders(),
   });
   return handleResponse<void>(response);
 }
@@ -78,7 +135,7 @@ export async function sendAgentMessage(
 ): Promise<{ reply: string; tool_executions: ToolExecution[] }> {
   const response = await fetch(`${AGENT_URL}/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       message,
       history: history.map(({ role, content }) => ({ role, content })),
@@ -104,13 +161,17 @@ export async function streamAgentMessage(
 ): Promise<void> {
   const response = await fetch(`${AGENT_URL}/chat/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       message,
       history: history.map(({ role, content }) => ({ role, content })),
     }),
   });
 
+  if (response.status === 401) {
+    clearToken();
+    onUnauthorized?.();
+  }
   if (!response.ok) {
     const body = await response.text();
     throw new Error(body || `Request failed (${response.status})`);

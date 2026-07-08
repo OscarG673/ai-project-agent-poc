@@ -15,6 +15,7 @@ dist/
 .DS_Store
 .idea/
 .vscode/
+.claude/
 
 # Unrelated local experiments (not part of this repo)
 how-are-you-148k/

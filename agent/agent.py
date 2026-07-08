@@ -9,7 +9,7 @@ from typing import Any, Awaitable, Callable, Optional
 
 from anthropic import Anthropic
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from mcp import ClientSession, StdioServerParameters
@@ -97,20 +97,22 @@ def _mcp_tool_to_anthropic(tool: Any) -> dict[str, Any]:
     }
 
 
-def _mcp_server_env() -> dict[str, str]:
+def _mcp_server_env(auth_token: Optional[str] = None) -> dict[str, str]:
     env = os.environ.copy()
     api_base = os.getenv("API_BASE_URL")
     if api_base:
         env["API_BASE_URL"] = api_base
+    if auth_token:
+        env["API_AUTH_TOKEN"] = auth_token
     return env
 
 
 @asynccontextmanager
-async def mcp_session():
+async def mcp_session(auth_token: Optional[str] = None):
     server_params = StdioServerParameters(
         command=MCP_SERVER_COMMAND,
         args=[MCP_SERVER_SCRIPT],
-        env=_mcp_server_env(),
+        env=_mcp_server_env(auth_token),
     )
     async with stdio_client(server_params) as (read, write):
         async with ClientSession(read, write) as session:
@@ -324,12 +326,15 @@ def _friendly_error(exc: BaseException) -> str:
 
 
 async def run_agent(
-    message: str, history: list[ChatMessage], emit: Optional[EmitFn] = None
+    message: str,
+    history: list[ChatMessage],
+    emit: Optional[EmitFn] = None,
+    auth_token: Optional[str] = None,
 ) -> ChatResponse:
     if emit:
         await emit("mcp_spawn", {"detail": "Spawning MCP server subprocess (stdio)"})
 
-    async with mcp_session() as session:
+    async with mcp_session(auth_token) as session:
         listed = await session.list_tools()
         tools = listed.tools
 
@@ -382,10 +387,18 @@ def health():
     return info
 
 
+def _bearer_token(authorization: Optional[str]) -> Optional[str]:
+    if authorization and authorization.lower().startswith("bearer "):
+        return authorization[7:].strip()
+    return None
+
+
 @app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, authorization: Optional[str] = Header(None)):
     try:
-        return await run_agent(request.message, request.history)
+        return await run_agent(
+            request.message, request.history, auth_token=_bearer_token(authorization)
+        )
     except HTTPException:
         raise
     except Exception as exc:
@@ -393,9 +406,10 @@ async def chat(request: ChatRequest):
 
 
 @app.post("/chat/stream")
-async def chat_stream(request: ChatRequest):
+async def chat_stream(request: ChatRequest, authorization: Optional[str] = Header(None)):
     import asyncio
 
+    auth_token = _bearer_token(authorization)
     queue: asyncio.Queue[tuple[str, dict[str, Any]] | None] = asyncio.Queue()
 
     async def emit(event: str, data: dict[str, Any]) -> None:
@@ -403,7 +417,7 @@ async def chat_stream(request: ChatRequest):
 
     async def run() -> None:
         try:
-            result = await run_agent(request.message, request.history, emit)
+            result = await run_agent(request.message, request.history, emit, auth_token)
             await queue.put(("done", {"tool_executions": [t.model_dump() for t in result.tool_executions]}))
         except HTTPException as exc:
             await queue.put(("error", {"message": str(exc.detail)}))

@@ -24,5 +24,25 @@ class ProjectResponse(ProjectBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    owner_id: int
     created_at: datetime
     updated_at: datetime
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(..., min_length=1, max_length=50)
+    password: str = Field(..., min_length=1)
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    username: str
+    status: bool
+    created_at: datetime
