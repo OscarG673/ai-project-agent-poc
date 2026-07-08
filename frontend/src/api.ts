@@ -81,6 +81,22 @@ export interface ToolExecution {
   result: string;
 }
 
+export interface Page<T> {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+function pageQuery(page?: number, pageSize?: number): string {
+  const p = new URLSearchParams();
+  if (page) p.set("page", String(page));
+  if (pageSize) p.set("page_size", String(pageSize));
+  const s = p.toString();
+  return s ? `?${s}` : "";
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
   if (response.status === 401) {
     clearToken();
@@ -123,11 +139,15 @@ export async function fetchMe(): Promise<CurrentUser> {
 
 // ── Proyectos ──
 
-export async function fetchProyectos(): Promise<Proyecto[]> {
-  const response = await fetch(`${API_URL}/proyectos`, {
-    headers: authHeaders(),
-  });
-  return handleResponse<Proyecto[]>(response);
+export async function fetchProyectos(
+  page?: number,
+  pageSize?: number
+): Promise<Page<Proyecto>> {
+  const response = await fetch(
+    `${API_URL}/proyectos${pageQuery(page, pageSize)}`,
+    { headers: authHeaders() }
+  );
+  return handleResponse<Page<Proyecto>>(response);
 }
 
 export async function createProyecto(data: ProyectoInput): Promise<Proyecto> {
@@ -162,13 +182,15 @@ export async function deleteProyecto(id: number): Promise<void> {
 // ── Requerimientos ──
 
 export async function fetchRequerimientos(
-  projectId: number
-): Promise<Requerimiento[]> {
+  projectId: number,
+  page?: number,
+  pageSize?: number
+): Promise<Page<Requerimiento>> {
   const response = await fetch(
-    `${API_URL}/proyectos/${projectId}/requerimientos`,
+    `${API_URL}/proyectos/${projectId}/requerimientos${pageQuery(page, pageSize)}`,
     { headers: authHeaders() }
   );
-  return handleResponse<Requerimiento[]>(response);
+  return handleResponse<Page<Requerimiento>>(response);
 }
 
 export async function createRequerimiento(

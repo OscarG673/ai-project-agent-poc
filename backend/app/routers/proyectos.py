@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import Proyecto, Usuario, utcnow
+from app.pagination import Page, PageParams, build_page
 from app.schemas import ProyectoCreate, ProyectoResponse, ProyectoUpdate
 
 router = APIRouter(prefix="/proyectos", tags=["proyectos"])
@@ -29,17 +30,21 @@ def create_proyecto(
     return proyecto
 
 
-@router.get("", response_model=list[ProyectoResponse])
+@router.get("", response_model=Page[ProyectoResponse])
 def list_proyectos(
+    params: PageParams = Depends(),
     db: Session = Depends(get_db),
     user: Usuario = Depends(get_current_user),
 ):
-    return (
-        db.query(Proyecto)
-        .filter(Proyecto.usuario_id == user.id)
-        .order_by(Proyecto.id.desc())
+    query = db.query(Proyecto).filter(Proyecto.usuario_id == user.id)
+    total = query.count()
+    items = (
+        query.order_by(Proyecto.id.desc())
+        .offset(params.offset)
+        .limit(params.page_size)
         .all()
     )
+    return build_page(items, total, params)
 
 
 @router.get("/{project_id}", response_model=ProyectoResponse)

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import Proyecto, Requerimiento, Usuario, utcnow
+from app.pagination import Page, PageParams, build_page
 from app.schemas import (
     RequerimientoCreate,
     RequerimientoResponse,
@@ -48,20 +49,24 @@ def create_requerimiento(
 
 @router.get(
     "/proyectos/{project_id}/requerimientos",
-    response_model=list[RequerimientoResponse],
+    response_model=Page[RequerimientoResponse],
 )
 def list_requerimientos(
     project_id: int,
+    params: PageParams = Depends(),
     db: Session = Depends(get_db),
     user: Usuario = Depends(get_current_user),
 ):
     _owned_proyecto(project_id, db, user)
-    return (
-        db.query(Requerimiento)
-        .filter(Requerimiento.project_id == project_id)
-        .order_by(Requerimiento.prioridad.asc(), Requerimiento.id.desc())
+    query = db.query(Requerimiento).filter(Requerimiento.project_id == project_id)
+    total = query.count()
+    items = (
+        query.order_by(Requerimiento.prioridad.asc(), Requerimiento.id.desc())
+        .offset(params.offset)
+        .limit(params.page_size)
         .all()
     )
+    return build_page(items, total, params)
 
 
 @router.get("/requerimientos/{req_id}", response_model=RequerimientoResponse)

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import Proyecto, Transcripcion, Usuario
+from app.pagination import Page, PageParams, build_page
 from app.schemas import TranscripcionCreate, TranscripcionResponse
 
 router = APIRouter(prefix="/transcripciones", tags=["transcripciones"])
@@ -31,17 +32,21 @@ def create_transcripcion(
     return transcripcion
 
 
-@router.get("", response_model=list[TranscripcionResponse])
+@router.get("", response_model=Page[TranscripcionResponse])
 def list_transcripciones(
+    params: PageParams = Depends(),
     db: Session = Depends(get_db),
     user: Usuario = Depends(get_current_user),
 ):
-    return (
-        db.query(Transcripcion)
-        .filter(Transcripcion.usuario_id == user.id)
-        .order_by(Transcripcion.id.desc())
+    query = db.query(Transcripcion).filter(Transcripcion.usuario_id == user.id)
+    total = query.count()
+    items = (
+        query.order_by(Transcripcion.id.desc())
+        .offset(params.offset)
+        .limit(params.page_size)
         .all()
     )
+    return build_page(items, total, params)
 
 
 @router.get("/{transcripcion_id}", response_model=TranscripcionResponse)

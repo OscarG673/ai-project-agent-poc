@@ -45,6 +45,17 @@ async def _request(method: str, path: str, **kwargs: Any) -> str:
 ESTADOS = "pendiente, en_progreso, completado, descartado"
 
 
+def _unwrap_items(result: str) -> str:
+    """List endpoints return a paginated envelope; give the LLM just the items."""
+    try:
+        data = json.loads(result)
+    except json.JSONDecodeError:
+        return result
+    if isinstance(data, dict) and "items" in data:
+        return json.dumps(data["items"], default=str)
+    return result
+
+
 @server.list_tools()
 async def list_tools() -> list[Tool]:
     return [
@@ -169,7 +180,9 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         result = await _request("POST", "/proyectos", json=arguments)
 
     elif name == "listar_proyectos":
-        result = await _request("GET", "/proyectos")
+        result = _unwrap_items(
+            await _request("GET", "/proyectos", params={"page_size": 100})
+        )
 
     elif name == "obtener_proyecto":
         result = await _request("GET", f"/proyectos/{arguments['id']}")
@@ -188,8 +201,12 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         )
 
     elif name == "listar_requerimientos":
-        result = await _request(
-            "GET", f"/proyectos/{arguments['project_id']}/requerimientos"
+        result = _unwrap_items(
+            await _request(
+                "GET",
+                f"/proyectos/{arguments['project_id']}/requerimientos",
+                params={"page_size": 100},
+            )
         )
 
     elif name == "actualizar_requerimiento":

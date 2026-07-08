@@ -31,6 +31,8 @@ const EMPTY_FORM: RequerimientoInput = {
   estado: "pendiente",
 };
 
+const PAGE_SIZE = 8;
+
 interface RequerimientosPanelProps {
   proyecto: Proyecto;
   onClose: () => void;
@@ -44,18 +46,28 @@ export default function RequerimientosPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<RequerimientoInput>(EMPTY_FORM);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setItems(await fetchRequerimientos(proyecto.id));
+      const data = await fetchRequerimientos(proyecto.id, page, PAGE_SIZE);
+      if (data.items.length === 0 && data.total > 0 && page > 1) {
+        setPage((p) => Math.max(1, p - 1));
+        return;
+      }
+      setItems(data.items);
+      setTotal(data.total);
+      setTotalPages(data.pages);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar requerimientos");
     } finally {
       setLoading(false);
     }
-  }, [proyecto.id]);
+  }, [proyecto.id, page]);
 
   useEffect(() => {
     void load();
@@ -105,6 +117,7 @@ export default function RequerimientosPanel({
       <div className="req-header">
         <h3>
           Requerimientos · <span className="muted">{proyecto.name}</span>
+          {total > 0 && <span className="muted"> ({total})</span>}
         </h3>
         <button type="button" className="bubble-icon-btn" onClick={onClose}>
           ✕
@@ -183,6 +196,30 @@ export default function RequerimientosPanel({
             </li>
           ))}
         </ul>
+      )}
+
+      {totalPages > 1 && (
+        <div className="pager">
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            ← Anterior
+          </button>
+          <span className="pager-info">
+            Página {page} de {totalPages}
+          </span>
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >
+            Siguiente →
+          </button>
+        </div>
       )}
     </div>
   );

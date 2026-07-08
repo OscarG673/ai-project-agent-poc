@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import Comment, Requerimiento, Usuario
+from app.pagination import Page, PageParams, build_page
 from app.schemas import CommentCreate, CommentResponse
 
 router = APIRouter(tags=["comments"])
@@ -41,20 +42,24 @@ def create_comment(
 
 @router.get(
     "/requerimientos/{req_id}/comments",
-    response_model=list[CommentResponse],
+    response_model=Page[CommentResponse],
 )
 def list_comments(
     req_id: int,
+    params: PageParams = Depends(),
     db: Session = Depends(get_db),
     user: Usuario = Depends(get_current_user),
 ):
     _owned_requerimiento(req_id, db, user)
-    return (
-        db.query(Comment)
-        .filter(Comment.requerimiento_id == req_id)
-        .order_by(Comment.created_at.asc())
+    query = db.query(Comment).filter(Comment.requerimiento_id == req_id)
+    total = query.count()
+    items = (
+        query.order_by(Comment.created_at.asc())
+        .offset(params.offset)
+        .limit(params.page_size)
         .all()
     )
+    return build_page(items, total, params)
 
 
 @router.delete(

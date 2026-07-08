@@ -16,6 +16,8 @@ const EMPTY_FORM: ProyectoInput = {
   end_date: "",
 };
 
+const PAGE_SIZE = 6;
+
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
   // Parse date-only strings (YYYY-MM-DD) as local, not UTC, to avoid off-by-one.
@@ -43,22 +45,32 @@ export default function ProyectosDashboard({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [form, setForm] = useState<ProyectoInput>(EMPTY_FORM);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   const loadProyectos = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchProyectos();
-      setProyectos(data);
+      const data = await fetchProyectos(page, PAGE_SIZE);
+      // If a delete emptied the last page, step back.
+      if (data.items.length === 0 && data.total > 0 && page > 1) {
+        setPage((p) => Math.max(1, p - 1));
+        return;
+      }
+      setProyectos(data.items);
+      setTotal(data.total);
+      setTotalPages(data.pages);
       setSelectedId((prev) =>
-        prev !== null && data.some((p) => p.id === prev) ? prev : null
+        prev !== null && data.items.some((p) => p.id === prev) ? prev : null
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudieron cargar los proyectos");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     void loadProyectos();
@@ -81,6 +93,7 @@ export default function ProyectosDashboard({
       end_date: form.end_date || null,
     };
 
+    const isCreate = editingId === null;
     setError(null);
     try {
       if (editingId !== null) {
@@ -89,7 +102,9 @@ export default function ProyectosDashboard({
         await createProyecto(payload);
       }
       resetForm();
-      await loadProyectos();
+      // New project sorts to the top → jump to page 1; else reload current page.
+      if (isCreate && page !== 1) setPage(1);
+      else await loadProyectos();
       onProjectsChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar");
@@ -131,7 +146,7 @@ export default function ProyectosDashboard({
           <p className="muted dashboard-subtitle">
             {loading
               ? "Cargando…"
-              : `${proyectos.length} proyecto${proyectos.length !== 1 ? "s" : ""}`}
+              : `${total} proyecto${total !== 1 ? "s" : ""}`}
           </p>
         </div>
       </div>
@@ -257,6 +272,30 @@ export default function ProyectosDashboard({
           ))}
         </ul>
       </div>
+
+      {totalPages > 1 && (
+        <div className="pager">
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            ← Anterior
+          </button>
+          <span className="pager-info">
+            Página {page} de {totalPages}
+          </span>
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >
+            Siguiente →
+          </button>
+        </div>
+      )}
 
       {selected && (
         <RequerimientosPanel
