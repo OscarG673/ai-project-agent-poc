@@ -26,19 +26,47 @@ function authHeaders(extra: Record<string, string> = {}): Record<string, string>
   return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
 }
 
-export interface Project {
+export interface Proyecto {
   id: number;
+  usuario_id: number;
   name: string;
-  description: string;
-  status: string;
+  descripcion: string | null;
+  init_date: string | null;
+  end_date: string | null;
   created_at: string;
   updated_at: string;
 }
 
-export interface ProjectInput {
+export interface ProyectoInput {
   name: string;
-  description: string;
-  status: string;
+  descripcion?: string | null;
+  init_date?: string | null;
+  end_date?: string | null;
+}
+
+export type EstadoRequerimiento =
+  | "pendiente"
+  | "en_progreso"
+  | "completado"
+  | "descartado";
+
+export interface Requerimiento {
+  id: number;
+  project_id: number;
+  name: string;
+  descripcion: string | null;
+  prioridad: number;
+  estado: EstadoRequerimiento;
+  transcripcion_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RequerimientoInput {
+  name: string;
+  descripcion?: string | null;
+  prioridad: number;
+  estado?: EstadoRequerimiento;
 }
 
 export interface ChatMessage {
@@ -93,36 +121,85 @@ export async function fetchMe(): Promise<CurrentUser> {
   return handleResponse<CurrentUser>(response);
 }
 
-export async function fetchProjects(): Promise<Project[]> {
-  const response = await fetch(`${API_URL}/projects`, {
+// ── Proyectos ──
+
+export async function fetchProyectos(): Promise<Proyecto[]> {
+  const response = await fetch(`${API_URL}/proyectos`, {
     headers: authHeaders(),
   });
-  return handleResponse<Project[]>(response);
+  return handleResponse<Proyecto[]>(response);
 }
 
-export async function createProject(data: ProjectInput): Promise<Project> {
-  const response = await fetch(`${API_URL}/projects`, {
+export async function createProyecto(data: ProyectoInput): Promise<Proyecto> {
+  const response = await fetch(`${API_URL}/proyectos`, {
     method: "POST",
     headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(data),
   });
-  return handleResponse<Project>(response);
+  return handleResponse<Proyecto>(response);
 }
 
-export async function updateProject(
+export async function updateProyecto(
   id: number,
-  data: Partial<ProjectInput>
-): Promise<Project> {
-  const response = await fetch(`${API_URL}/projects/${id}`, {
+  data: Partial<ProyectoInput>
+): Promise<Proyecto> {
+  const response = await fetch(`${API_URL}/proyectos/${id}`, {
     method: "PUT",
     headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(data),
   });
-  return handleResponse<Project>(response);
+  return handleResponse<Proyecto>(response);
 }
 
-export async function deleteProject(id: number): Promise<void> {
-  const response = await fetch(`${API_URL}/projects/${id}`, {
+export async function deleteProyecto(id: number): Promise<void> {
+  const response = await fetch(`${API_URL}/proyectos/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  return handleResponse<void>(response);
+}
+
+// ── Requerimientos ──
+
+export async function fetchRequerimientos(
+  projectId: number
+): Promise<Requerimiento[]> {
+  const response = await fetch(
+    `${API_URL}/proyectos/${projectId}/requerimientos`,
+    { headers: authHeaders() }
+  );
+  return handleResponse<Requerimiento[]>(response);
+}
+
+export async function createRequerimiento(
+  projectId: number,
+  data: RequerimientoInput
+): Promise<Requerimiento> {
+  const response = await fetch(
+    `${API_URL}/proyectos/${projectId}/requerimientos`,
+    {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify(data),
+    }
+  );
+  return handleResponse<Requerimiento>(response);
+}
+
+export async function updateRequerimiento(
+  id: number,
+  data: Partial<RequerimientoInput>
+): Promise<Requerimiento> {
+  const response = await fetch(`${API_URL}/requerimientos/${id}`, {
+    method: "PUT",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(data),
+  });
+  return handleResponse<Requerimiento>(response);
+}
+
+export async function deleteRequerimiento(id: number): Promise<void> {
+  const response = await fetch(`${API_URL}/requerimientos/${id}`, {
     method: "DELETE",
     headers: authHeaders(),
   });

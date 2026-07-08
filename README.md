@@ -1,244 +1,156 @@
-# AI Project Manager POC
+# Requirements Agent
 
-A minimal monorepo that demonstrates **natural-language project management** using an AI agent, the [Model Context Protocol (MCP)](https://modelcontextprotocol.io), and a REST API.
+Gestión de **proyectos y requerimientos** en lenguaje natural, con un agente que usa el [Model Context Protocol (MCP)](https://modelcontextprotocol.io), una API REST sobre **PostgreSQL**, y un microservicio de **transcripción de voz (Whisper)**.
 
-Manage projects from a React dashboard **or** from a floating agent chat. The LLM chooses MCP tools from your message — no keyword matching, no hardcoded intents.
+Administra proyectos y sus requerimientos desde un dashboard React **o** desde el agente conversacional. El LLM elige las herramientas MCP a partir de tu mensaje — sin keyword matching.
 
-## Architecture
+## Arquitectura
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  Frontend (React + Vite)                         :5173      │
-│  · Projects dashboard (manual CRUD)                         │
-│  · Floating agent bubble (chat + live MCP flow)             │
-└───────────────┬─────────────────────────┬───────────────────┘
-                │ HTTP                    │ HTTP (SSE stream)
-                ▼                         ▼
-┌───────────────────────┐     ┌─────────────────────────────┐
-│  Backend (FastAPI)    │     │  Agent (FastAPI)       :8001  │
-│  :8000                │     │  · LLM (Ollama/OpenAI/       │
-│  · CRUD /projects     │◄────│    Anthropic)               │
-│  · SQLite only here   │ HTTP│  · Spawns MCP subprocess    │
-└───────────┬───────────┘     └──────────────┬──────────────┘
-            │                                 │ stdio (MCP)
-            ▼                                 ▼
-     ┌─────────────┐               ┌─────────────────────┐
-     │   SQLite    │               │  MCP Server         │
-     │ projects.db │               │  · 5 project tools  │
-     └─────────────┘               └─────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│  Frontend (React + Vite)                              :5173    │
+│  · Dashboard de proyectos + requerimientos                     │
+│  · Burbuja de agente (chat + flujo MCP en vivo)                │
+│  · Login JWT                                                   │
+└───────────────┬─────────────────────────┬─────────────────────┘
+                │ HTTP (Bearer)            │ HTTP (Bearer, SSE)
+                ▼                          ▼
+┌───────────────────────┐     ┌──────────────────────────────┐
+│  Backend (FastAPI)    │     │  Agent (FastAPI)        :8001  │
+│  :8000                │     │  · LLM (Ollama/OpenAI/        │
+│  · Auth JWT           │◄────│    Anthropic)                 │
+│  · CRUD proyectos,    │ HTTP│  · Lanza MCP por request      │
+│    requerimientos,    │     │  · Propaga el token al MCP    │
+│    comments,          │     └──────────────┬───────────────┘
+│    transcripciones    │                    │ stdio (MCP)
+│  · Solo esto toca BD  │                    ▼
+└───────────┬───────────┘         ┌──────────────────────┐
+            │                     │  MCP Server          │
+            ▼                     │  · Tools proyectos/  │
+     ┌─────────────┐              │    requerimientos    │
+     │ PostgreSQL  │              └──────────────────────┘
+     │ (Docker)    │
+     └─────────────┘
+
+┌──────────────────────────────┐
+│  STT Service (FastAPI)  :8002 │  mlx-whisper (Apple Silicon)
+│  · POST /transcribe (audio)   │  devuelve texto → transcripciones
+└──────────────────────────────┘
 ```
 
-**Rule:** Only the backend touches the database. The MCP server calls the REST API. The agent talks to the LLM and MCP.
+**Regla:** solo el backend toca la base de datos. El MCP llama a la API REST. El token JWT viaja `frontend → agent → MCP → backend`.
 
 ## Stack
 
-| Layer | Tech | Port |
-|-------|------|------|
+| Capa | Tecnología | Puerto |
+|------|-----------|--------|
 | Frontend | React 18, TypeScript, Vite 6 | `5173` |
-| Backend | FastAPI, SQLAlchemy, Pydantic | `8000` |
-| Database | SQLite | — |
-| Agent | FastAPI, OpenAI SDK, Anthropic SDK | `8001` |
+| Backend | FastAPI, SQLAlchemy 2, Pydantic, PyJWT, bcrypt | `8000` |
+| Base de datos | PostgreSQL 16 (psycopg 3) | `5432` |
+| Agent | FastAPI, OpenAI/Anthropic SDK | `8001` |
 | MCP Server | Python MCP SDK, httpx | stdio |
-| LLM (default) | [Ollama](https://ollama.com) — local, no API key | `11434` |
+| STT Service | FastAPI, mlx-whisper | `8002` |
+| LLM (default) | [Ollama](https://ollama.com) `qwen2:7b` | `11434` |
 
-## Folder structure
+## Modelo de datos
 
-```
-ai-project-agent-poc/
-├── README.md
-├── .gitignore
-├── frontend/
-│   ├── src/
-│   │   ├── App.tsx
-│   │   ├── api.ts
-│   │   └── components/
-│   │       ├── ProjectsDashboard.tsx   # manual CRUD
-│   │       ├── AgentBubble.tsx         # floating chat
-│   │       └── McpFlowPanel.tsx        # live MCP pipeline UI
-│   └── .env.example
-├── backend/
-│   └── app/
-│       ├── main.py
-│       ├── database.py
-│       ├── models.py
-│       ├── schemas.py
-│       └── routers/projects.py
-├── mcp-server/
-│   └── server.py                       # MCP tools → REST API
-└── agent/
-    └── agent.py                        # LLM + MCP orchestration
-```
+- **usuarios** — `username`, `pass_hash` (bcrypt), `status`
+- **proyectos** — `usuario_id` (dueño), `name`, `descripcion`, `init_date`, `end_date`
+- **requerimientos** — `project_id`, `name`, `descripcion`, `prioridad` (1–5), `estado` (`pendiente`/`en_progreso`/`completado`/`descartado`), `transcripcion_id`
+- **transcripciones** — `usuario_id`, `project_id`, `audio_path`, `texto_stt`, `respuesta_llm` (jsonb), `modelo_stt`, `modelo_llm`, `tool_calls` (jsonb)
+- **comments** — `requerimiento_id` (1-a-muchos, cascade), `usuario_id`, `description`
 
-## Prerequisites
-
-- **Python 3.11+**
-- **Node.js 18+**
-- **[Ollama](https://ollama.com)** (recommended — free, local) **or** an OpenAI / Anthropic API key
-
-```bash
-ollama pull qwen2:7b
-ollama serve   # if not already running
-```
+Cada proyecto pertenece a un usuario; los endpoints filtran por dueño.
 
 ## Quick start
 
-### 1. Backend
+### 1. Base de datos (Docker)
+
+```bash
+docker compose up -d db     # PostgreSQL en :5432
+```
+
+> Sin Docker, cualquier PostgreSQL sirve — apunta `DATABASE_URL` a él.
+
+### 2. Backend
 
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
 
-### 2. MCP Server dependencies
+Crea las tablas al arrancar y siembra el admin (`admin` / `admin123`). Docs: http://localhost:8000/docs
 
-The MCP server runs as a **subprocess** of the agent (stdio). Install deps once:
-
-```bash
-cd mcp-server
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-```
-
-### 3. Agent
+### 3. MCP + Agent
 
 ```bash
-cd agent
-source ../mcp-server/.venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-python agent.py
+cd mcp-server && python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && cp .env.example .env
+cd ../agent && source ../mcp-server/.venv/bin/activate && pip install -r requirements.txt && cp .env.example .env
+python agent.py     # :8001
 ```
-
-Agent: **http://localhost:8001** · Docs: **http://localhost:8001/docs**
 
 ### 4. Frontend
 
 ```bash
-cd frontend
-npm install
-cp .env.example .env
-npm run dev
+cd frontend && npm install && cp .env.example .env && npm run dev   # :5173
 ```
 
-Open **http://localhost:5173**
-
-## Run all services (3 terminals)
+### 5. STT Service (opcional, Apple Silicon)
 
 ```bash
-# Terminal 1 — Backend
-cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --port 8000
-
-# Terminal 2 — Agent (spawns MCP automatically)
-cd agent && source ../mcp-server/.venv/bin/activate && python agent.py
-
-# Terminal 3 — Frontend
-cd frontend && npm run dev
+cd stt-service && python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && cp .env.example .env
+uvicorn main:app --host 0.0.0.0 --port 8002
 ```
 
-## How the agent works
+### Todo con Docker
 
-1. You send a message from the chat bubble.
-2. The agent starts the MCP server as a subprocess and lists available tools.
-3. Your message + tool schemas go to the LLM (Ollama by default).
-4. The model **reasons** and may call tools like `create_project` or `list_projects`.
-5. The agent executes each tool via MCP → HTTP → SQLite.
-6. The model replies with a short confirmation.
-7. The UI streams events (`mcp_spawn`, `tool_start`, `message`, …) in the MCP flow panel.
-
-No `if "create" in message` logic — tool selection is entirely up to the LLM.
-
-## Environment variables
-
-| Service | Variable | Default | Description |
-|---------|----------|---------|-------------|
-| Backend | `DATABASE_URL` | `sqlite:///./projects.db` | SQLite connection |
-| Backend | `CORS_ORIGINS` | `http://localhost:5173` | Allowed frontend origin |
-| MCP | `API_BASE_URL` | `http://localhost:8000` | FastAPI base URL |
-| Agent | `AI_PROVIDER` | `ollama` | `ollama`, `openai`, or `anthropic` |
-| Agent | `OLLAMA_BASE_URL` | `http://localhost:11434/v1` | Ollama OpenAI-compatible API |
-| Agent | `OLLAMA_MODEL` | `qwen2:7b` | Local model name |
-| Agent | `OPENAI_API_KEY` | — | Required when `AI_PROVIDER=openai` |
-| Agent | `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI model |
-| Agent | `ANTHROPIC_API_KEY` | — | Required when `AI_PROVIDER=anthropic` |
-| Agent | `ANTHROPIC_MODEL` | `claude-3-5-haiku-latest` | Anthropic model |
-| Agent | `AGENT_PORT` | `8001` | Agent HTTP port |
-| Agent | `MCP_SERVER_SCRIPT` | `../mcp-server/server.py` | Path to MCP server |
-| Frontend | `VITE_API_URL` | `http://localhost:8000` | Backend URL |
-| Frontend | `VITE_AGENT_URL` | `http://localhost:8001` | Agent URL |
+```bash
+docker compose up   # db + backend
+```
 
 ## API — Backend (`:8000`)
 
-| Method | Path | Description |
+Todos los endpoints (salvo `/auth/login` y `/health`) requieren `Authorization: Bearer <token>`.
+
+| Método | Ruta | Descripción |
 |--------|------|-------------|
-| `POST` | `/projects` | Create project |
-| `GET` | `/projects` | List projects |
-| `GET` | `/projects/{id}` | Get project |
-| `PUT` | `/projects/{id}` | Update project |
-| `DELETE` | `/projects/{id}` | Delete project |
-| `GET` | `/health` | Health check |
+| `POST` | `/auth/login` | Login → JWT |
+| `GET` | `/auth/me` | Usuario actual |
+| `POST/GET` | `/proyectos` | Crear / listar proyectos |
+| `GET/PUT/DELETE` | `/proyectos/{id}` | Ver / actualizar / eliminar |
+| `POST/GET` | `/proyectos/{id}/requerimientos` | Crear / listar requerimientos |
+| `GET/PUT/DELETE` | `/requerimientos/{id}` | Ver / actualizar / eliminar |
+| `POST/GET` | `/requerimientos/{id}/comments` | Crear / listar comentarios |
+| `DELETE` | `/comments/{id}` | Eliminar comentario |
+| `POST/GET` | `/transcripciones` | Crear / listar transcripciones |
+| `GET` | `/transcripciones/{id}` | Ver transcripción |
 
-**Project fields:** `id`, `name`, `description`, `status`, `created_at`, `updated_at`
+## Herramientas MCP
 
-**Statuses:** `active`, `completed`, `archived`, `on_hold`
+`crear_proyecto`, `listar_proyectos`, `obtener_proyecto`, `actualizar_proyecto`, `eliminar_proyecto`, `crear_requerimiento`, `listar_requerimientos`, `actualizar_requerimiento`, `eliminar_requerimiento`.
 
-## API — Agent (`:8001`)
+## Variables de entorno (backend)
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/chat` | Chat (JSON response) |
-| `POST` | `/chat/stream` | Chat with SSE events (used by UI) |
-| `GET` | `/health` | Provider + model info |
+| Variable | Default | Descripción |
+|----------|---------|-------------|
+| `DATABASE_URL` | `postgresql+psycopg://ania:ania@localhost:5432/requirements_agent` | Conexión a Postgres |
+| `CORS_ORIGINS` | `http://localhost:5173` | Origen permitido |
+| `JWT_SECRET` | — | Secreto para firmar tokens (cámbialo en prod) |
+| `JWT_EXPIRE_MINUTES` | `1440` | Expiración del token |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | `admin` / `admin123` | Usuario sembrado al arrancar |
 
-## MCP tools
+El agente propaga el token del usuario al MCP vía `API_AUTH_TOKEN`, y el MCP lo manda como Bearer al backend.
 
-| Tool | REST mapping |
-|------|----------------|
-| `create_project` | `POST /projects` |
-| `list_projects` | `GET /projects` |
-| `get_project` | `GET /projects/{id}` |
-| `update_project` | `PUT /projects/{id}` |
-| `delete_project` | `DELETE /projects/{id}` |
+## Ejemplos de prompts
 
-## Example prompts
+- "Crea un proyecto llamado Portal Clientes"
+- "Muéstrame todos mis proyectos"
+- "En el proyecto 2, crea un requerimiento de prioridad 1 llamado Login seguro"
+- "Marca como completado el requerimiento 3"
 
-- "Create a project called Bitcoin Zone"
-- "Show me all my projects"
-- "Change Bitcoin Zone status to completed"
-- "Delete project #3"
+## Licencia
 
-## Health checks
-
-```bash
-curl http://localhost:8000/health
-curl http://localhost:8001/health
-```
-
-## Switching LLM provider
-
-Edit `agent/.env`:
-
-```env
-# Ollama (default)
-AI_PROVIDER=ollama
-OLLAMA_MODEL=qwen2:7b
-
-# OpenAI
-AI_PROVIDER=openai
-OPENAI_API_KEY=sk-...
-
-# Anthropic
-AI_PROVIDER=anthropic
-ANTHROPIC_API_KEY=sk-ant-...
-```
-
-Restart the agent after changing provider.
-
-## License
-
-MIT — use freely for learning and demos.
+MIT — úsalo libremente para aprender y hacer demos.

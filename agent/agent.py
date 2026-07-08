@@ -33,22 +33,27 @@ MCP_SERVER_SCRIPT = os.getenv(
     str(Path(__file__).resolve().parent.parent / "mcp-server" / "server.py"),
 )
 
-SYSTEM_PROMPT = """You are a project management assistant. You help users create, list, view, update, and delete projects.
+SYSTEM_PROMPT = """Eres un asistente de gestión de proyectos y requerimientos. Ayudas a crear, listar, ver, actualizar y eliminar proyectos, y a gestionar los requerimientos de cada proyecto.
 
-Use the available tools to fulfill user requests. When a user refers to a project by name, first list projects to find the matching ID before updating or deleting.
+Usa las herramientas disponibles para cumplir las solicitudes. Cuando el usuario se refiera a un proyecto o requerimiento por su nombre, primero lista para encontrar el ID correcto antes de actualizar o eliminar. Para crear un requerimiento necesitas el project_id: si no lo tienes, lista los proyectos primero.
 
-After completing actions, reply with a short, friendly confirmation (1-2 sentences). Do not dump raw JSON unless the user asks for details.
+La prioridad de un requerimiento es un entero de 1 (más alta) a 5 (más baja).
+Los estados válidos de un requerimiento son: pendiente, en_progreso, completado, descartado.
 
-Valid project statuses include: active, completed, archived, on_hold."""
+Después de completar acciones, responde con una confirmación breve y amable (1-2 oraciones). No vuelques JSON crudo a menos que el usuario pida detalles."""
 
 EmitFn = Callable[[str, dict[str, Any]], Awaitable[None]]
 
 TOOL_HTTP: dict[str, Callable[[dict[str, Any]], tuple[str, str]]] = {
-    "create_project": lambda _: ("POST", "/projects"),
-    "list_projects": lambda _: ("GET", "/projects"),
-    "get_project": lambda a: ("GET", f"/projects/{a.get('id', '?')}"),
-    "update_project": lambda a: ("PUT", f"/projects/{a.get('id', '?')}"),
-    "delete_project": lambda a: ("DELETE", f"/projects/{a.get('id', '?')}"),
+    "crear_proyecto": lambda _: ("POST", "/proyectos"),
+    "listar_proyectos": lambda _: ("GET", "/proyectos"),
+    "obtener_proyecto": lambda a: ("GET", f"/proyectos/{a.get('id', '?')}"),
+    "actualizar_proyecto": lambda a: ("PUT", f"/proyectos/{a.get('id', '?')}"),
+    "eliminar_proyecto": lambda a: ("DELETE", f"/proyectos/{a.get('id', '?')}"),
+    "crear_requerimiento": lambda a: ("POST", f"/proyectos/{a.get('project_id', '?')}/requerimientos"),
+    "listar_requerimientos": lambda a: ("GET", f"/proyectos/{a.get('project_id', '?')}/requerimientos"),
+    "actualizar_requerimiento": lambda a: ("PUT", f"/requerimientos/{a.get('id', '?')}"),
+    "eliminar_requerimiento": lambda a: ("DELETE", f"/requerimientos/{a.get('id', '?')}"),
 }
 
 

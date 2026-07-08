@@ -6,8 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth import hash_password
 from app.database import Base, SessionLocal, engine
-from app.models import User
-from app.routers import auth, projects
+from app.models import Usuario
+from app.routers import auth, comments, proyectos, requerimientos, transcripciones
 
 load_dotenv()
 
@@ -20,9 +20,11 @@ def seed_admin() -> None:
     password = os.getenv("ADMIN_PASSWORD", "admin123")
     db = SessionLocal()
     try:
-        existing = db.query(User).filter(User.username == username).first()
+        existing = db.query(Usuario).filter(Usuario.username == username).first()
         if existing is None:
-            db.add(User(username=username, password_hash=hash_password(password)))
+            db.add(
+                Usuario(username=username, pass_hash=hash_password(password), status=True)
+            )
             db.commit()
     finally:
         db.close()
@@ -30,7 +32,7 @@ def seed_admin() -> None:
 
 seed_admin()
 
-app = FastAPI(title="Project Manager API", version="1.0.0")
+app = FastAPI(title="Requirements Agent API", version="2.0.0")
 
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
 
@@ -43,7 +45,10 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
-app.include_router(projects.router)
+app.include_router(proyectos.router)
+app.include_router(requerimientos.router)
+app.include_router(comments.router)
+app.include_router(transcripciones.router)
 
 
 @app.get("/health")

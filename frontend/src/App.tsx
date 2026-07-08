@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import AgentBubble from "./components/AgentBubble";
 import Login from "./components/Login";
-import ProjectsDashboard from "./components/ProjectsDashboard";
+import ProyectosDashboard from "./components/ProyectosDashboard";
 import { clearToken, getToken, setUnauthorizedHandler } from "./api";
 
 export default function App() {
@@ -27,8 +27,8 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <div>
-          <h1>AI Project Manager</h1>
-          <p className="muted">Manage projects · Agent in the corner</p>
+          <h1>Requirements Agent</h1>
+          <p className="muted">Proyectos y requerimientos · Agente en la esquina</p>
         </div>
         <button className="secondary" onClick={handleLogout}>
           Log out
@@ -36,7 +36,7 @@ export default function App() {
       </header>
 
       <main className="app-main">
-        <ProjectsDashboard refreshKey={refreshKey} onProjectsChanged={bumpRefresh} />
+        <ProyectosDashboard refreshKey={refreshKey} onProjectsChanged={bumpRefresh} />
       </main>
 
       <AgentBubble onProjectsChanged={bumpRefresh} />

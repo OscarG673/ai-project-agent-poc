@@ -1107,3 +1107,114 @@ code {
 .login-card button[type="submit"] {
   margin-top: 0.5rem;
 }
+
+/* ── Requerimientos panel ── */
+
+.req-panel {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 12px;
+  background: #0f1419;
+  border: 1px solid #243044;
+  flex-shrink: 0;
+}
+
+.req-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.req-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #e7ecf3;
+}
+
+.req-form {
+  display: grid;
+  grid-template-columns: 1fr 80px 150px auto;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.req-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.req-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.6rem 0.75rem;
+  background: #141b26;
+  border: 1px solid #243044;
+  border-radius: 10px;
+}
+
+.req-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.req-name {
+  font-size: 0.9rem;
+  color: #e7ecf3;
+}
+
+.req-desc {
+  font-size: 0.78rem;
+  color: #9aa7b8;
+}
+
+.prioridad {
+  flex-shrink: 0;
+  width: 30px;
+  text-align: center;
+  padding: 0.2rem 0;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: ui-monospace, monospace;
+  background: #243044;
+  color: #c5d0de;
+}
+
+.prioridad-1 { background: #7f1d1d; color: #fecaca; }
+.prioridad-2 { background: #713f12; color: #fcd34d; }
+.prioridad-3 { background: #1e3a5f; color: #93c5fd; }
+.prioridad-4, .prioridad-5 { background: #243044; color: #9aa7b8; }
+
+.estado-select {
+  width: auto;
+  flex-shrink: 0;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 999px;
+}
+
+.estado-pendiente { background: #3f3f46; color: #d4d4d8; }
+.estado-en_progreso { background: #713f12; color: #fcd34d; }
+.estado-completado { background: #14532d; color: #86efac; }
+.estado-descartado { background: #3b1219; color: #fca5a5; }
+
+.req-del {
+  flex: 0 0 auto;
+  width: 32px;
+  padding: 0.35rem 0;
+}
+
+@media (max-width: 600px) {
+  .req-form {
+    grid-template-columns: 1fr 1fr;
+  }
+}

@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
@@ -7,17 +6,14 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./projects.db")
+# PostgreSQL via psycopg 3, e.g.
+#   postgresql+psycopg://user:password@localhost:5432/requirements_agent
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+psycopg://ania:ania@localhost:5432/requirements_agent",
+)
 
-if DATABASE_URL.startswith("sqlite"):
-    db_path = DATABASE_URL.replace("sqlite:///", "")
-    if db_path.startswith("./"):
-        db_path = Path(__file__).resolve().parent.parent / db_path[2:]
-    connect_args = {"check_same_thread": False}
-else:
-    connect_args = {}
-
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

@@ -4,8 +4,8 @@ Microservicio de STT (Speech-to-Text) con mlx_whisper.
 Recibe audio subido (multipart/form-data), lo transcribe con Whisper
 optimizado para Apple Silicon (MLX) y devuelve el texto.
 
-Correr:
-    uvicorn main:app --host 0.0.0.0 --port 8001
+Correr (puerto 8002 — el 8001 lo usa el agent):
+    uvicorn main:app --host 0.0.0.0 --port 8002
 
 El backend de conversaciones consume el campo `texto` de la respuesta.
 """

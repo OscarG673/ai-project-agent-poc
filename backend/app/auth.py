@@ -11,7 +11,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import User
+from app.models import Usuario
 
 JWT_SECRET = os.getenv("JWT_SECRET", "dev-insecure-change-me")
 JWT_ALGORITHM = "HS256"
@@ -57,13 +57,13 @@ def _decode_token(token: str) -> dict:
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(_bearer),
     db: Session = Depends(get_db),
-) -> User:
+) -> Usuario:
     payload = _decode_token(credentials.credentials)
     username: Optional[str] = payload.get("sub")
     if not username:
         raise HTTPException(status_code=401, detail="Invalid token payload")
 
-    user = db.query(User).filter(User.username == username).first()
+    user = db.query(Usuario).filter(Usuario.username == username).first()
     if not user or not user.status:
         raise HTTPException(status_code=401, detail="User not found or inactive")
     return user

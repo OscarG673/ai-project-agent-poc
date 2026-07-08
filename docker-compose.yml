@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16
+    container_name: ania-postgres
+    environment:
+      POSTGRES_USER: ania
+      POSTGRES_PASSWORD: ania
+      POSTGRES_DB: requirements_agent
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ania -d requirements_agent"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: ania-backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://ania:ania@db:5432/requirements_agent
+      CORS_ORIGINS: http://localhost:5173
+      JWT_SECRET: change-me-to-a-long-random-string-in-prod
+      JWT_EXPIRE_MINUTES: "1440"
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: admin123
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:

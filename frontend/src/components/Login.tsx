@@ -29,8 +29,8 @@ export default function Login({ onLoggedIn }: LoginProps) {
     <div className="login-screen">
       <form className="login-card" onSubmit={handleSubmit}>
         <div className="chat-avatar login-avatar">AI</div>
-        <h1 className="login-title">AI Project Manager</h1>
-        <p className="muted login-subtitle">Sign in to continue</p>
+        <h1 className="login-title">Requirements Agent</h1>
+        <p className="muted login-subtitle">Inicia sesión para continuar</p>
 
         <div className="form-field">
           <label className="field-label" htmlFor="username">

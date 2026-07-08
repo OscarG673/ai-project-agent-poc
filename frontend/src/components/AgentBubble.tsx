@@ -11,24 +11,31 @@ interface AgentBubbleProps {
 }
 
 const SUGGESTIONS = [
-  "Create a project called Bitcoin Zone",
-  "Show me all my projects",
-  "Change Bitcoin Zone status to completed",
+  "Crea un proyecto llamado Sistema RRHH",
+  "Muéstrame todos mis proyectos",
+  "Agrega un requerimiento de prioridad 1 al proyecto Sistema RRHH",
 ];
 
 const TOOL_LABELS: Record<string, string> = {
-  create_project: "Create project",
-  list_projects: "List projects",
-  get_project: "Get project",
-  update_project: "Update project",
-  delete_project: "Delete project",
+  crear_proyecto: "Crear proyecto",
+  listar_proyectos: "Listar proyectos",
+  obtener_proyecto: "Ver proyecto",
+  actualizar_proyecto: "Actualizar proyecto",
+  eliminar_proyecto: "Eliminar proyecto",
+  crear_requerimiento: "Crear requerimiento",
+  listar_requerimientos: "Listar requerimientos",
+  actualizar_requerimiento: "Actualizar requerimiento",
+  eliminar_requerimiento: "Eliminar requerimiento",
 };
 
 function summarizeToolArgs(name: string, args: Record<string, unknown>): string {
-  if (name === "create_project" && args.name) return `"${args.name}"`;
-  if (name === "update_project" && args.name) return `id ${args.id} → "${args.name}"`;
-  if (name === "update_project" && args.status) return `id ${args.id} → ${args.status}`;
+  if (name.startsWith("crear_") && args.name) return `"${args.name}"`;
+  if (name === "actualizar_requerimiento" && args.estado)
+    return `id ${args.id} → ${args.estado}`;
+  if (name === "actualizar_proyecto" && args.name)
+    return `id ${args.id} → "${args.name}"`;
   if (args.id !== undefined) return `id ${args.id}`;
+  if (args.project_id !== undefined) return `proyecto ${args.project_id}`;
   return "";
 }
 
@@ -178,12 +185,12 @@ export default function AgentBubble({ onProjectsChanged }: AgentBubbleProps) {
   return (
     <div className="agent-bubble-root">
       {open && (
-        <div className="bubble-panel" role="dialog" aria-label="Project agent">
+        <div className="bubble-panel" role="dialog" aria-label="Agente de requerimientos">
           <header className="bubble-header">
             <div className="chat-header-info">
               <span className="chat-avatar">AI</span>
               <div>
-                <h2>Project Agent</h2>
+                <h2>Agente</h2>
                 <p className="muted">MCP · Ollama</p>
               </div>
             </div>
@@ -298,7 +305,7 @@ export default function AgentBubble({ onProjectsChanged }: AgentBubbleProps) {
         type="button"
         className={`bubble-fab ${loading ? "bubble-fab-busy" : ""} ${open ? "bubble-fab-hidden" : ""}`}
         onClick={() => setOpen(true)}
-        aria-label="Open project agent"
+        aria-label="Abrir agente"
       >
         {loading ? (
           <span className="bubble-fab-pulse" />
